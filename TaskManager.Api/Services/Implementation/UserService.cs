@@ -1,14 +1,19 @@
 ﻿using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using TaskManager.Api.Models;
+using TaskManager.Api.Models.Domains;
+using TaskManager.Api.Models.DTOs;
+using TaskManager.Api.Services.Interfaces;
+using Task = System.Threading.Tasks.Task;
 
-namespace TaskManager.Api.Services;
+namespace TaskManager.Api.Services.Implementation;
 
 /// <summary>
 /// Сервис для работы с пользователями: аутентификация, авторизация и управление учетными данными
 /// </summary>
-public class UserService
+public class UserService : IUserService
 {
     private readonly ApplicationContext _context;
     private readonly IPasswordHasher<User> _passwordHasher;
@@ -173,6 +178,140 @@ public class UserService
         catch (Exception ex)
         {
             _logger?.LogError(ex, "Ошибка при создании ClaimsIdentity для пользователя {Username}", username);
+            throw new ApplicationException("Ошибка создания токена", ex);
+        }
+    }
+
+    /// <summary>
+    /// Создает нового пользователя из DTO
+    /// </summary>
+    public async Task<User> CreateUserAsync(UserCreateDTO? userDto)
+    {
+        if (userDto == null)
+            throw new ArgumentNullException(nameof(userDto));
+
+        var user = new User
+        {
+            FirstName = userDto.FirstName,
+            LastName = userDto.LastName,
+            Login = userDto.Login,
+            Email = userDto.Email,
+            Phone = userDto.Phone,
+            Photo = userDto.Photo,
+            UserStatus = userDto.UserStatus,
+            RegistrationDate = DateTime.Now,
+            LastLoginDate = DateTime.Now
+        };
+
+        // Хэшируем пароль
+        user.Password = _passwordHasher.HashPassword(user, userDto.Password);
+        
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return user;
+    }
+
+    /// <summary>
+    /// Создает несколько пользователей из списка DTO
+    /// </summary>
+    public async Task<IEnumerable<User>> CreateUsersAsync(IEnumerable<UserCreateDTO>? usersDto)
+    {
+        if (usersDto == null)
+            throw new ArgumentNullException(nameof(usersDto));
+
+        var users = new List<User>();
+        foreach (var userDto in usersDto)
+        {
+            var user = await CreateUserAsync(userDto);
+            users.Add(user);
+        }
+
+        return users;
+    }
+
+    /// <summary>
+    /// Получает пользователя по ID
+    /// </summary>
+    public async Task<User> GetUserByIdAsync(int userId)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            throw new KeyNotFoundException($"User with ID {userId} not found");
+
+        return user;
+    }
+
+    /// <summary>
+    /// Получает всех пользователей
+    /// </summary>
+    public async Task<IEnumerable<User>> GetAllUsersAsync()
+    {
+        return await _context.Users.ToListAsync();
+    }
+
+    /// <summary>
+    /// Обновляет данные пользователя
+    /// </summary>
+    public async Task<User> UpdateUserAsync(int id, UserUpdateDTO userDTO)
+    {
+        var user = await GetUserByIdAsync(id);
+
+        // Обновляем только предоставленные поля
+        user.FirstName = userDTO.FirstName;
+        user.LastName = userDTO.LastName;
+        user.Login = userDTO.Login;
+        user.Email = userDTO.Email;
+        user.Phone = userDTO.Phone ?? user.Phone;
+        user.Photo = userDTO.Photo ?? user.Photo;
+        user.UserStatus = userDTO.UserStatus ?? user.UserStatus;
+
+        // Обновляем пароль только если он был предоставлен
+        if (!string.IsNullOrEmpty(userDTO.Password))
+        {
+            user.Password = _passwordHasher.HashPassword(user, userDTO.Password);
+        }
+
+        _context.Users.Update(user);
+        await _context.SaveChangesAsync();
+
+        return user;
+    }
+
+    /// <summary>
+    /// Удаляет пользователя
+    /// </summary>
+    public async Task DeleteUserAsync(int id)
+    {
+        var user = await GetUserByIdAsync(id);
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Создает ClaimsIdentity для JWT-токена
+    /// </summary>
+    public ClaimsIdentity CreateClaimsIdentity(User user)
+    {
+        try
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimsIdentity.DefaultNameClaimType, user.Login),
+                new Claim(ClaimTypes.Role, user.UserStatus.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
+            };
+
+            return new ClaimsIdentity(
+                claims,
+                "Token",
+                ClaimsIdentity.DefaultNameClaimType,
+                ClaimsIdentity.DefaultRoleClaimType);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка при создании ClaimsIdentity для пользователя {Username}", user.Login);
             throw new ApplicationException("Ошибка создания токена", ex);
         }
     }

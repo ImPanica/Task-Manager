@@ -1,10 +1,12 @@
 using System.Text;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TaskManager.Api.Models;
+using TaskManager.Api.Models.Domains;
+using TaskManager.Api.Services.Implementation;
+using TaskManager.Api.Services.Interfaces;
 using TaskManager.Models;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,6 +24,7 @@ string connectionString = builder.Configuration.GetConnectionString("DefaultConn
 
 builder.Services.AddDbContext<ApplicationContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddIdentityCore<User>().AddEntityFrameworkStores<ApplicationContext>();
+
 // Настройка JWT аутентификации
 // Добавляем сервис аутентификации в контейнер зависимостей.
 builder.Services.AddAuthentication(options =>
@@ -64,6 +67,7 @@ builder.Services.AddAuthentication(options =>
 
 // Добавляем PasswordHasher в контейнер зависимостей
 builder.Services.AddScoped<PasswordHasher<User>>();
+builder.Services.AddScoped<UserService>();
 //builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 var app = builder.Build();

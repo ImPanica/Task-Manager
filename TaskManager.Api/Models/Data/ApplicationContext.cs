@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using TaskManager.Api.Models.Domains;
+using TaskManager.Api.Models.Domains.Domains;
+using Task = TaskManager.Api.Models.Domains.Task;
 
 namespace TaskManager.Api.Models;
 

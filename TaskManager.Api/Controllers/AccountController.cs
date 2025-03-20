@@ -1,12 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
-using TaskManager.Api.Models;
-using TaskManager.Api.Services;
-using TaskManager.Models;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using TaskManager.Api.Models;
+using TaskManager.Api.Models.Domains;
+using TaskManager.Api.Models.DTOs;
+using TaskManager.Api.Services.Implementation;
+using TaskManager.Models;
 
 namespace TaskManager.Api.Controllers;
 
@@ -20,57 +23,68 @@ public class AccountController : ControllerBase
     private readonly UserService _userService;
     private readonly ILogger<UserService> _logger;
 
-    public AccountController(ApplicationContext context, IPasswordHasher<User> passwordHasher,
+    public AccountController(
+        ApplicationContext context,
+        IPasswordHasher<User> passwordHasher,
         IConfiguration configuration,
+        UserService userService,
         ILogger<UserService> logger = null)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _passwordHasher = passwordHasher ?? throw new ArgumentNullException(nameof(passwordHasher));
-        _logger = logger;
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-        _userService = new UserService(_context, _passwordHasher, _logger);
-    }
-
-    [HttpGet("info")]
-    public async Task<ActionResult<User>> GetUser()
-    {
-        var userName = HttpContext.User.Identity.Name;
-        var user = _context.Users.FirstOrDefault(u => u.Login == userName);
-
-        if (user == null)
-            return NotFound("User not found");
-
-        return user;
+        _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+        _logger = logger;
     }
 
     /// <summary>
-    /// Аутентификация пользователя и выдача JWT токена
+    /// Получает информацию о текущем пользователе
     /// </summary>
-    /// <returns>JWT токен в случае успешной аутентификации</returns>
-    [HttpPost("auth")]
-    public async Task<IActionResult> GetToken()
+    [HttpGet("info")]
+    public async Task<ActionResult<UserReadDTO>> GetUser()
     {
         try
         {
-            _logger.LogInformation("Попытка получить учетные данные из Basic Auth");
-            // Получаем учетные данные из Basic Auth заголовка
-            var (username, password) = _userService.GetUserCredentialsFromBasicAuth(Request);
-            _logger.LogInformation($"Получены данные: username={username != null}, password={password != null}");
+            var userName = HttpContext.User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName))
+                return Unauthorized("User not authenticated");
 
-            // Проверяем наличие учетных данных
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
-            {
-                return BadRequest(new { error = "Отсутствуют учетные данные" });
-            }
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Login == userName);
+            if (user == null)
+                return NotFound("User not found");
 
-            // Получаем ClaimsIdentity для пользователя
-            var identity = _userService.GetUserClaimsIdentity(username, password);
+            var userReadDto = UserReadDTO.MapToUserReadDTO(user);
+            return Ok(userReadDto);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка получения информации о пользователе");
+            return StatusCode(500, "Internal server error");
+        }
+    }
 
-            // Если аутентификация не удалась, возвращаем ошибку
-            if (identity == null)
-            {
-                return Unauthorized(new { error = "Неверный логин или пароль" });
-            }
+    /// <summary>
+    /// Аутентифицирует пользователя и возвращает JWT токен
+    /// </summary>
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] UserLoginDTO loginDto)
+    {
+        try
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Login == loginDto.Login);
+            if (user == null)
+                return Unauthorized("Invalid login or password");
+
+            var result = _passwordHasher.VerifyHashedPassword(user, user.Password, loginDto.Password);
+            if (result == PasswordVerificationResult.Failed)
+                return Unauthorized("Invalid login or password");
+
+            // Обновляем дату последнего входа
+            user.LastLoginDate = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            // Создаем ClaimsIdentity для JWT-токена
+            var identity = _userService.CreateClaimsIdentity(user);
 
             // Создаем и настраиваем токен
             var now = DateTime.UtcNow;
@@ -99,36 +113,40 @@ public class AccountController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Ошибка при генерации JWT токена");
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Внутренняя ошибка сервера" });
+            _logger?.LogError(ex, "Ошибка при аутентификации пользователя");
+            return StatusCode(500, "Internal server error");
         }
     }
 
-    // Метод для обновления данных пользователя по ID
+    /// <summary>
+    /// Обновляет данные текущего пользователя
+    /// </summary>
     [Authorize]
     [HttpPut("update")]
-    public async Task<IActionResult> UpdateUser([FromBody] UserModel? userModel)
+    public async Task<ActionResult<UserReadDTO>> UpdateUserAsync([FromBody] UserUpdateDTO? userDto)
     {
-        if (userModel == null)
-            return BadRequest("User Model cannot be null");
+        if (userDto == null)
+            return BadRequest("User model cannot be null");
 
-        // Поиск пользователя по Login
-        var login = HttpContext.User.Identity.Name;
-        var user = await _context.Users.FindAsync(login);
-        if (user == null)
-            return NotFound($"User Not Found");
+        try
+        {
+            var userName = HttpContext.User.Identity?.Name;
+            if (string.IsNullOrEmpty(userName))
+                return Unauthorized("User not authenticated");
 
-        user.FirstName = userModel.FirstName;
-        user.LastName = userModel.LastName;
-        user.Login = userModel.Login;
-        user.Email = userModel.Email;
-        user.Password = _passwordHasher.HashPassword(user, userModel.Password);
-        user.Phone = userModel.Phone;
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Login == userName);
+            if (user == null)
+                return NotFound("User not found");
 
-        _context.Users.Update(user);
-        await _context.SaveChangesAsync();
-
-        // Возвращаем результат и новые данные пользователя
-        return Ok(user);
+            var updatedUser = await _userService.UpdateUserAsync(user.Id, userDto);
+            var userReadDto = UserReadDTO.MapToUserReadDTO(updatedUser);
+            return Ok(userReadDto);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Ошибка обновления данных пользователя");
+            return StatusCode(500, "Internal server error");
+        }
     }
+
 }

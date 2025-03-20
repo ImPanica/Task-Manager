@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace TaskManager.Api.Models;
+namespace TaskManager.Api.Models.Domains;
 
 public class CommonObject
 {

@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace TaskManager.Api.Models;
+namespace TaskManager.Api.Models.Domains;
 
 public class Task : CommonObject
 {

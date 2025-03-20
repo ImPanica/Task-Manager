@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using TaskManager.Api.Models.Domains;
+using TaskManager.Api.Models.Domains.Domains;
 
 namespace TaskManager.Api.Models;
 

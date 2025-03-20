@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TaskManager.Api.Models;
-using TaskManager.Models;
+using TaskManager.Api.Models.DTOs;
+using TaskManager.Api.Services.Implementation;
 
 namespace TaskManager.Api.Controllers;
 
@@ -12,113 +10,146 @@ namespace TaskManager.Api.Controllers;
 [ApiController]
 public class UsersController : ControllerBase
 {
-    private readonly ApplicationContext _context;
-    private readonly PasswordHasher<User> _passwordHasher;
+    private readonly UserService _userService;
+    private readonly ILogger<UserService> _logger;
 
-    public UsersController(ApplicationContext context, PasswordHasher<User> passwordHasher)
+    public UsersController(UserService userService, ILogger<UserService> logger)
     {
-        _context = context;
-        _passwordHasher = passwordHasher;
+        _userService = userService;
+        _logger = logger;
     }
 
-    // Метод для создания нового пользователя
+    /// <summary>
+    /// Создает нового пользователя
+    /// </summary>
     [HttpPost("create")]
-    public async Task<IActionResult> CreateUser([FromBody] UserModel? userModel)
+    public async Task<ActionResult<UserReadDTO>> CreateUser([FromBody] UserCreateDTO? userDto)
     {
-        if (userModel == null)
-            return BadRequest("User Model cannot be null");
+        if (userDto == null)
+            return BadRequest("User model cannot be null");
 
-        // Создаем объект с новым пользователем
-        var user = new User(userModel);
-
-        // Хэшируем пароль
-        user.Password = _passwordHasher.HashPassword(user, userModel.Password);
-        // Добавляем юзера
-        _context.Users.Add(user);
-        // Созраняем изменения
-        await _context.SaveChangesAsync();
-        // Возвращаем результат и ID созданного пользователя
-        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
-    }
-
-    // Метод для создания пользователей из списка
-    [HttpPost("create/bulk")]
-    public async Task<IActionResult> CreateUsers([FromBody] IEnumerable<UserModel>? users)
-    {
-        if (users == null)
-            return BadRequest("User Model cannot be null");
-
-        var newUsers = new List<User>();
-        foreach (var user in users)
+        try
         {
-            var newUser = new User(user);
-            newUser.Password = _passwordHasher.HashPassword(newUser, user.Password);
-            newUsers.Add(newUser);
+            var user = await _userService.CreateUserAsync(userDto);
+            var userReadDto = UserReadDTO.MapToUserReadDTO(user);
+            return CreatedAtAction(nameof(GetUser), new { id = user.Id }, userReadDto);
         }
-
-        _context.Users.AddRange(newUsers);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(nameof(GetAllUsers), null, newUsers);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка создания нового пользователя");
+            return StatusCode(500, "Internal server error");
+        }
     }
 
-    // Метод для получения пользователя по ID
+    /// <summary>
+    /// Создает несколько пользователей
+    /// </summary>
+    [HttpPost("create/bulk")]
+    public async Task<ActionResult<IEnumerable<UserReadDTO>>> CreateUsers([FromBody] IEnumerable<UserCreateDTO>? usersDto)
+    {
+        if (usersDto == null)
+            return BadRequest("User models cannot be null");
+
+        try
+        {
+            var users = await _userService.CreateUsersAsync(usersDto);
+            var userReadDtos = users.Select(UserReadDTO.MapToUserReadDTO);
+            return CreatedAtAction(nameof(GetAllUsers), null, userReadDtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка создания пользователей");
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    /// <summary>
+    /// Получает пользователя по ID
+    /// </summary>
     [HttpGet("{id}")]
-    public async Task<IActionResult> GetUser(int id)
+    public async Task<ActionResult<UserReadDTO>> GetUser(int id)
     {
-        // Поиск пользователя по ID
-        var user = await _context.Users.FindAsync(id);
-        // Возврат результата
-        return user != null ? Ok(user) : NotFound($"User with id {id} Not Found");
+        try
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            var userReadDto = UserReadDTO.MapToUserReadDTO(user);
+            return Ok(userReadDto);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка получения пользователя");
+            return StatusCode(500, "Internal server error");
+        }
     }
 
-    // Метод для обновления данных пользователя по ID
+    /// <summary>
+    /// Обновляет данные пользователя
+    /// </summary>
     [HttpPut("{id}")]
-    public async Task<IActionResult> UpdateUser(int id, [FromBody] UserModel? userModel)
+    public async Task<ActionResult<UserReadDTO>> UpdateUser(int id, [FromBody] UserUpdateDTO? userDto)
     {
-        if (userModel == null)
-            return BadRequest("User Model cannot be null");
+        if (userDto == null)
+            return BadRequest("User model cannot be null");
 
-        // Поиск пользователя по ID
-        var user = await _context.Users.FindAsync(id);
-        if (!user.Id.Equals(id))
-            return NotFound($"User with id {id} Not Found");
-
-        user.FirstName = userModel.FirstName;
-        user.LastName = userModel.LastName;
-        user.Login = userModel.Login;
-        user.Email = userModel.Email;
-        user.Password = _passwordHasher.HashPassword(user, userModel.Password);
-        user.Phone = userModel.Phone;
-        user.UserStatus = userModel.UserStatus;
-
-        _context.Users.Update(user);
-        await _context.SaveChangesAsync();
-
-        // Возвращаем результат и новые данные пользователя
-        return Ok(user);
+        try
+        {
+            var user = await _userService.UpdateUserAsync(id, userDto);
+            var userReadDto = UserReadDTO.MapToUserReadDTO(user);
+            return Ok(userReadDto);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка обновления пользователя");
+            return StatusCode(500, "Internal server error");
+        }
     }
 
-    // Метод для удаления пользователя по ID
+    /// <summary>
+    /// Удаляет пользователя
+    /// </summary>
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        // Поиск пользователя по ID
-        var user = await _context.Users.FindAsync(id);
-        if (user == null)
-            return NotFound($"User with id {id} Not Found");
-
-        // Удаляем пользователя
-        _context.Users.Remove(user);
-        await _context.SaveChangesAsync();
-        return NoContent();
+        try
+        {
+            await _userService.DeleteUserAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка удаления пользователя");
+            return StatusCode(500, "Internal server error");
+        }
     }
 
-    // Метод для получения всех пользователей
+    /// <summary>
+    /// Получает всех пользователей
+    /// </summary>
     [HttpGet("all")]
-    public async Task<ActionResult<IEnumerable<User>>> GetAllUsers()
+    public async Task<ActionResult<IEnumerable<UserReadDTO>>> GetAllUsers()
     {
-        var users = await _context.Users.ToListAsync();
-        return Ok(users);
+        try
+        {
+            var users = await _userService.GetAllUsersAsync();
+            var userReadDtos = users.Select(UserReadDTO.MapToUserReadDTO);
+            return Ok(userReadDtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Ошибка получения списка пользователей");
+            return StatusCode(500, "Internal server error");
+        }
     }
 }
