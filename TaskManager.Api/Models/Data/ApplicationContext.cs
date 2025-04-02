@@ -12,6 +12,7 @@ public class ApplicationContext : DbContext
     public DbSet<Task> Tasks { get; set; }
     public DbSet<ProjectAdmin> ProjectAdmins { get; set; }
     public DbSet<Desk> Desks { get; set; }
+    public DbSet<Column> Columns { get; set; }
 
     public ApplicationContext(DbContextOptions<ApplicationContext> options) : base(options)
     {
@@ -53,6 +54,19 @@ public class ApplicationContext : DbContext
             .HasOne(d => d.Admin)
             .WithMany(u => u.Desks)
             .HasForeignKey(d => d.AdminId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Column configuration
+        modelBuilder.Entity<Column>()
+            .HasOne(c => c.Desk)
+            .WithMany(d => d.Columns)
+            .HasForeignKey(c => c.DeskId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Task>()
+            .HasOne(t => t.Column)
+            .WithMany(c => c.Tasks)
+            .HasForeignKey(t => t.ColumnId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // ProjectAdmin configuration

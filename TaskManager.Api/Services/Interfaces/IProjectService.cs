@@ -39,4 +39,27 @@ public interface IProjectService
     /// <param name="id">Идентификатор проекта, который нужно удалить.</param>
     /// <returns>Задача, представляющая асинхронную операцию удаления.</returns>
     Task DeleteProjectAsync(int id);
+
+    /// <summary>
+    /// Получает все проекты пользователя асинхронно.
+    /// </summary>
+    /// <param name="userId">Идентификатор пользователя.</param>
+    /// <returns>Задача, результатом которой является коллекция всех проектов пользователя.</returns>
+    Task<IEnumerable<Project>> GetUserProjectsAsync(int userId);
+
+    /// <summary>
+    /// Добавляет пользователя к проекту асинхронно.
+    /// </summary>
+    /// <param name="projectId">Идентификатор проекта.</param>
+    /// <param name="userId">Идентификатор пользователя.</param>
+    /// <returns>Задача, результатом которой является обновленный проект.</returns>
+    Task<Project> AddUserToProjectAsync(int projectId, int userId);
+
+    /// <summary>
+    /// Удаляет пользователя из проекта асинхронно.
+    /// </summary>
+    /// <param name="projectId">Идентификатор проекта.</param>
+    /// <param name="userId">Идентификатор пользователя.</param>
+    /// <returns>Задача, результатом которой является обновленный проект.</returns>
+    Task<Project> RemoveUserFromProjectAsync(int projectId, int userId);
 }

@@ -37,7 +37,44 @@ namespace TaskManager.Api.Migrations
                     b.ToTable("ProjectUser");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Desk", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Column", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreateDateTime")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("DeskId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("Photo")
+                        .HasColumnType("varbinary(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeskId");
+
+                    b.ToTable("Columns");
+                });
+
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Desk", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -47,10 +84,6 @@ namespace TaskManager.Api.Migrations
 
                     b.Property<int?>("AdminId")
                         .HasColumnType("int");
-
-                    b.Property<string>("Columns")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDateTime")
                         .HasColumnType("datetime2");
@@ -83,7 +116,7 @@ namespace TaskManager.Api.Migrations
                     b.ToTable("Desks");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Project", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Domains.Project", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -120,7 +153,7 @@ namespace TaskManager.Api.Migrations
                     b.ToTable("Projects");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Task", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -128,27 +161,8 @@ namespace TaskManager.Api.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("UserId")
+                    b.Property<int>("ColumnId")
                         .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("ProjectAdmins");
-                });
-
-            modelBuilder.Entity("TaskManager.Api.Models.Task", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Column")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreateDateTime")
                         .HasColumnType("datetime2");
@@ -186,6 +200,8 @@ namespace TaskManager.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ColumnId");
+
                     b.HasIndex("CreatorId");
 
                     b.HasIndex("DeskId");
@@ -195,7 +211,7 @@ namespace TaskManager.Api.Migrations
                     b.ToTable("Tasks");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.User", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -294,29 +310,58 @@ namespace TaskManager.Api.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ProjectAdmins");
+                });
+
             modelBuilder.Entity("ProjectUser", b =>
                 {
-                    b.HasOne("TaskManager.Api.Models.User", null)
+                    b.HasOne("TaskManager.Api.Models.Domains.User", null)
                         .WithMany()
                         .HasForeignKey("AllUsersId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TaskManager.Api.Models.Project", null)
+                    b.HasOne("TaskManager.Api.Models.Domains.Domains.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Desk", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Column", b =>
                 {
-                    b.HasOne("TaskManager.Api.Models.User", "Admin")
+                    b.HasOne("TaskManager.Api.Models.Domains.Desk", "Desk")
+                        .WithMany("Columns")
+                        .HasForeignKey("DeskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Desk");
+                });
+
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Desk", b =>
+                {
+                    b.HasOne("TaskManager.Api.Models.Domains.User", "Admin")
                         .WithMany("Desks")
                         .HasForeignKey("AdminId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TaskManager.Api.Models.Project", "Project")
+                    b.HasOne("TaskManager.Api.Models.Domains.Domains.Project", "Project")
                         .WithMany("AllDesks")
                         .HasForeignKey("ProjectId");
 
@@ -325,7 +370,7 @@ namespace TaskManager.Api.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Project", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Domains.Project", b =>
                 {
                     b.HasOne("TaskManager.Api.Models.ProjectAdmin", "Admin")
                         .WithMany("Projects")
@@ -334,34 +379,31 @@ namespace TaskManager.Api.Migrations
                     b.Navigation("Admin");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Task", b =>
                 {
-                    b.HasOne("TaskManager.Api.Models.User", "User")
-                        .WithMany("AdminProjects")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("TaskManager.Api.Models.Domains.Column", "Column")
+                        .WithMany("Tasks")
+                        .HasForeignKey("ColumnId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("TaskManager.Api.Models.Task", b =>
-                {
-                    b.HasOne("TaskManager.Api.Models.User", "Creator")
+                    b.HasOne("TaskManager.Api.Models.Domains.User", "Creator")
                         .WithMany("CreatedTasks")
                         .HasForeignKey("CreatorId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("TaskManager.Api.Models.Desk", "Desk")
+                    b.HasOne("TaskManager.Api.Models.Domains.Desk", "Desk")
                         .WithMany("Tasks")
                         .HasForeignKey("DeskId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TaskManager.Api.Models.User", "Executor")
+                    b.HasOne("TaskManager.Api.Models.Domains.User", "Executor")
                         .WithMany("ExecutedTasks")
                         .HasForeignKey("ExecutorId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Column");
 
                     b.Navigation("Creator");
 
@@ -370,22 +412,35 @@ namespace TaskManager.Api.Migrations
                     b.Navigation("Executor");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Desk", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
+                {
+                    b.HasOne("TaskManager.Api.Models.Domains.User", "User")
+                        .WithMany("AdminProjects")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Column", b =>
                 {
                     b.Navigation("Tasks");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.Project", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Desk", b =>
+                {
+                    b.Navigation("Columns");
+
+                    b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.Domains.Project", b =>
                 {
                     b.Navigation("AllDesks");
                 });
 
-            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
-                {
-                    b.Navigation("Projects");
-                });
-
-            modelBuilder.Entity("TaskManager.Api.Models.User", b =>
+            modelBuilder.Entity("TaskManager.Api.Models.Domains.User", b =>
                 {
                     b.Navigation("AdminProjects");
 
@@ -394,6 +449,11 @@ namespace TaskManager.Api.Migrations
                     b.Navigation("Desks");
 
                     b.Navigation("ExecutedTasks");
+                });
+
+            modelBuilder.Entity("TaskManager.Api.Models.ProjectAdmin", b =>
+                {
+                    b.Navigation("Projects");
                 });
 #pragma warning restore 612, 618
         }

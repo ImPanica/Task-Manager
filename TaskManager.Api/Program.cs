@@ -16,7 +16,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
 // Добавляем контроллеры
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 
 // Подключение к БД
 string connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ??
@@ -61,13 +65,15 @@ builder.Services.AddAuthentication(options =>
 
             // Указываем ключ, используемый для подписи токена. 
             // Ключ берётся из конфигурации приложения и преобразуется в массив байтов с использованием UTF-8 кодировки.
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Secret is not configured")))
         };
     });
 
 // Добавляем PasswordHasher в контейнер зависимостей
 builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IDeskService, DeskService>();
 //builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 var app = builder.Build();

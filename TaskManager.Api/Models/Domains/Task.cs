@@ -13,8 +13,9 @@ public class Task : CommonObject
     public int DeskId { get; set; }
     [ForeignKey("DeskId")]
     public Desk Desk { get; set; }
-    [Required]
-    public string Column { get; set; }
+    public int ColumnId { get; set; }
+    [ForeignKey("ColumnId")]
+    public virtual Column Column { get; set; }
     public int? CreatorId { get; set; }
     [ForeignKey("CreatorId")]
     public virtual User? Creator { get; set; }

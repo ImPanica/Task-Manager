@@ -88,6 +88,7 @@ public class AccountController : ControllerBase
 
             // Создаем и настраиваем токен
             var now = DateTime.UtcNow;
+            var key = Encoding.UTF8.GetBytes(_configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT Secret is not configured"));
             var jwt = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
@@ -95,7 +96,7 @@ public class AccountController : ControllerBase
                 claims: identity.Claims,
                 expires: now.Add(TimeSpan.FromMinutes(Convert.ToDouble(_configuration["Jwt:ExpiresMinutes"]))),
                 signingCredentials: new SigningCredentials(
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"])),
+                    new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256));
 
             // Сериализуем токен в строку

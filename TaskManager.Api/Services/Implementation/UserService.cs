@@ -233,13 +233,9 @@ public class UserService : IUserService
     /// <summary>
     /// Получает пользователя по ID
     /// </summary>
-    public async Task<User> GetUserByIdAsync(int userId)
+    public async Task<User?> GetUserByIdAsync(int id)
     {
-        var user = await _context.Users.FindAsync(userId);
-        if (user == null)
-            throw new KeyNotFoundException($"User with ID {userId} not found");
-
-        return user;
+        return await _context.Users.FindAsync(id);
     }
 
     /// <summary>
