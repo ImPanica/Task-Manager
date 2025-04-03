@@ -6,6 +6,7 @@ using TaskManager.Api.Models;
 using TaskManager.Api.Models.Domains;
 using TaskManager.Api.Models.DTOs;
 using TaskManager.Api.Services.Interfaces;
+using TaskManager.Models;
 using Task = System.Threading.Tasks.Task;
 
 namespace TaskManager.Api.Services.Implementation;
@@ -161,15 +162,24 @@ public class UserService : IUserService
             var claims = new List<Claim>
             {
                 new Claim(ClaimsIdentity.DefaultNameClaimType, user.Login),
-                new Claim(ClaimTypes.Role, user.UserStatus.ToString()),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
             };
 
+            // Добавляем роль в зависимости от статуса пользователя
+            if (user.UserStatus == UserStatus.Admin)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
+            else
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "User"));
+            }
+
             // Создаем ClaimsIdentity для JWT-токена
             var identity = new ClaimsIdentity(
                 claims,
-                "Token",
+                "jwt",
                 ClaimsIdentity.DefaultNameClaimType,
                 ClaimsIdentity.DefaultRoleClaimType);
 
@@ -289,26 +299,35 @@ public class UserService : IUserService
     /// </summary>
     public ClaimsIdentity CreateClaimsIdentity(User user)
     {
-        try
-        {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimsIdentity.DefaultNameClaimType, user.Login),
-                new Claim(ClaimTypes.Role, user.UserStatus.ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
-            };
+        if (user == null)
+            throw new ArgumentNullException(nameof(user));
 
-            return new ClaimsIdentity(
-                claims,
-                "Token",
-                ClaimsIdentity.DefaultNameClaimType,
-                ClaimsIdentity.DefaultRoleClaimType);
-        }
-        catch (Exception ex)
+        _logger?.LogInformation("Creating claims for user {Username} with status {UserStatus}", user.Login, user.UserStatus);
+
+        var claims = new List<Claim>
         {
-            _logger?.LogError(ex, "Ошибка при создании ClaimsIdentity для пользователя {Username}", user.Login);
-            throw new ApplicationException("Ошибка создания токена", ex);
+            new Claim(ClaimTypes.Name, user.Login),
+            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty)
+        };
+
+        // Add role claim based on user status
+        switch (user.UserStatus)
+        {
+            case UserStatus.Admin:
+                _logger?.LogInformation("Adding Admin role claim for user {Username}", user.Login);
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+                break;
+            case UserStatus.Editor:
+                _logger?.LogInformation("Adding Editor role claim for user {Username}", user.Login);
+                claims.Add(new Claim(ClaimTypes.Role, "Editor"));
+                break;
+            default:
+                _logger?.LogInformation("Adding User role claim for user {Username}", user.Login);
+                claims.Add(new Claim(ClaimTypes.Role, "User"));
+                break;
         }
+
+        return new ClaimsIdentity(claims, "jwt", ClaimTypes.Name, ClaimTypes.Role);
     }
 }

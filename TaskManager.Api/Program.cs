@@ -8,6 +8,7 @@ using TaskManager.Api.Models.Domains;
 using TaskManager.Api.Services.Implementation;
 using TaskManager.Api.Services.Interfaces;
 using TaskManager.Models;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,14 +59,15 @@ builder.Services.AddAuthentication(options =>
             ValidateIssuerSigningKey = true,
 
             // Указываем допустимого издателя токена (issuer), который берётся из конфигурации приложения.
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidIssuer = builder.Configuration["JWT:Issuer"],
 
             // Указываем допустимую аудиторию токена (audience), которая также берётся из конфигурации приложения.
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidAudience = builder.Configuration["JWT:Audience"],
 
             // Указываем ключ, используемый для подписи токена. 
             // Ключ берётся из конфигурации приложения и преобразуется в массив байтов с использованием UTF-8 кодировки.
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Secret is not configured")))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT Secret is not configured"))),
+            RoleClaimType = ClaimTypes.Role // Явно указываем тип claim для роли
         };
     });
 
@@ -74,7 +76,17 @@ builder.Services.AddScoped<PasswordHasher<User>>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddScoped<IDeskService, DeskService>();
+builder.Services.AddScoped<ITaskService, TaskService>();
 //builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+
+// Настраиваем авторизацию
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => 
+        policy.RequireRole("Admin", "Editor"));
+    options.AddPolicy("UserOnly", policy => 
+        policy.RequireRole("User"));
+});
 
 var app = builder.Build();
 
@@ -96,13 +108,29 @@ using (var scope = app.Services.CreateScope())
         context.Database.EnsureCreated();
 
         // Проверяем есть ли админ в системе
-        if (!context.Users.Any(u => u.UserStatus == UserStatus.Admin))
+        var existingAdmin = context.Users.FirstOrDefault(u => u.Login == "admin");
+        if (existingAdmin != null)
         {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Updating existing admin user with status {UserStatus}", existingAdmin.UserStatus);
+            
+            // Обновляем статус существующего администратора
+            existingAdmin.UserStatus = UserStatus.Admin;
+            context.Users.Update(existingAdmin);
+            context.SaveChanges();
+            
+            logger.LogInformation("Updated admin user with status {UserStatus}", existingAdmin.UserStatus);
+        }
+        else
+        {
+            var logger = services.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Creating new admin user...");
+
             var admin = new User
             {
                 FirstName = "John",
                 LastName = "Doe",
-                Login = "Admin",
+                Login = "admin",
                 Email = "admin@gmail.com",
                 Password = "123", // Временный пароль
                 Phone = "+79093070777",
@@ -115,6 +143,8 @@ using (var scope = app.Services.CreateScope())
 
             context.Users.Add(admin);
             context.SaveChanges();
+
+            logger.LogInformation("Created new admin user with status {UserStatus}", admin.UserStatus);
         }
     }
     catch (Exception ex)

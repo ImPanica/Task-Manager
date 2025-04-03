@@ -40,6 +40,7 @@ public class AccountController : ControllerBase
     /// <summary>
     /// Получает информацию о текущем пользователе
     /// </summary>
+    [Authorize]
     [HttpGet("info")]
     public async Task<ActionResult<UserReadDTO>> GetUser()
     {
@@ -79,6 +80,8 @@ public class AccountController : ControllerBase
             if (result == PasswordVerificationResult.Failed)
                 return Unauthorized("Invalid login or password");
 
+            _logger?.LogInformation("User {Username} logged in with status {UserStatus}", user.Login, user.UserStatus);
+
             // Обновляем дату последнего входа
             user.LastLoginDate = DateTime.Now;
             await _context.SaveChangesAsync();
@@ -90,11 +93,11 @@ public class AccountController : ControllerBase
             var now = DateTime.UtcNow;
             var key = Encoding.UTF8.GetBytes(_configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT Secret is not configured"));
             var jwt = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
+                issuer: _configuration["JWT:Issuer"],
+                audience: _configuration["JWT:Audience"],
                 notBefore: now,
                 claims: identity.Claims,
-                expires: now.Add(TimeSpan.FromMinutes(Convert.ToDouble(_configuration["Jwt:ExpiresMinutes"]))),
+                expires: now.Add(TimeSpan.FromMinutes(Convert.ToDouble(_configuration["JWT:ExpiresMinutes"]))),
                 signingCredentials: new SigningCredentials(
                     new SymmetricSecurityKey(key),
                     SecurityAlgorithms.HmacSha256));
@@ -107,7 +110,7 @@ public class AccountController : ControllerBase
             {
                 access_token = encodedToken,
                 username = identity.Name,
-                expires_in = _configuration["Jwt:ExpiresMinutes"]
+                expires_in = _configuration["JWT:ExpiresMinutes"]
             };
 
             return Ok(response);

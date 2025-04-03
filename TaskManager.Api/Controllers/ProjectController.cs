@@ -137,12 +137,14 @@ public class ProjectController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Project or user not found. ProjectId: {ProjectId}, UserId: {UserId}", projectId, userId);
+            _logger.LogWarning(ex, "Project or user not found. ProjectId: {ProjectId}, UserId: {UserId}", projectId,
+                userId);
             return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding user to project. ProjectId: {ProjectId}, UserId: {UserId}", projectId, userId);
+            _logger.LogError(ex, "Error adding user to project. ProjectId: {ProjectId}, UserId: {UserId}", projectId,
+                userId);
             return BadRequest(ex.Message);
         }
     }
@@ -157,12 +159,14 @@ public class ProjectController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            _logger.LogWarning(ex, "Project or user not found. ProjectId: {ProjectId}, UserId: {UserId}", projectId, userId);
+            _logger.LogWarning(ex, "Project or user not found. ProjectId: {ProjectId}, UserId: {UserId}", projectId,
+                userId);
             return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error removing user from project. ProjectId: {ProjectId}, UserId: {UserId}", projectId, userId);
+            _logger.LogError(ex, "Error removing user from project. ProjectId: {ProjectId}, UserId: {UserId}",
+                projectId, userId);
             return BadRequest(ex.Message);
         }
     }

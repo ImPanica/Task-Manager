@@ -58,7 +58,7 @@ public class DeskController : ControllerBase
         }
     }
 
-    [HttpGet]
+    [HttpGet("all")]
     public async Task<ActionResult<IEnumerable<Desk>>> GetAllDesks()
     {
         try
